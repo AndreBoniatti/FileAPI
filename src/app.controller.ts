@@ -9,9 +9,10 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { existsSync, mkdirSync } from 'fs';
 import { diskStorage } from 'multer';
-import path from 'path';
 import { v4 as uuid } from 'uuid';
-import { AppService } from './app.service';
+import { CreateFileDto } from './dto/create-file.dto';
+import { FilesService } from './services/files.service';
+import { S3Service } from './services/s3.service';
 
 export const multerOptions = {
   limits: { fileSize: 2 * 1024 * 1024 },
@@ -29,7 +30,7 @@ export const multerOptions = {
   },
   storage: diskStorage({
     destination: (req, file, cb) => {
-      const uploadPath = './tmp/uploads';
+      const uploadPath = process.env.LOCAL_STORAGE;
       if (!existsSync(uploadPath)) {
         mkdirSync(uploadPath);
       }
@@ -43,13 +44,21 @@ export const multerOptions = {
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(
+    private readonly s3Service: S3Service,
+    private readonly filesService: FilesService,
+  ) {}
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file', multerOptions))
   uploadFile(@UploadedFile() file: Express.Multer.File) {
-    console.log(file);
-    return;
-    this.appService.uploadFile(file);
+    const dataSave: CreateFileDto = new CreateFileDto(
+      file.originalname,
+      file.size,
+      file.filename,
+      file.path,
+    );
+    return this.filesService.create(dataSave);
+    // this.s3Service.uploadFile(file);
   }
 }
